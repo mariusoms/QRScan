@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Tech Submission App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 18px;
+            cursor: pointer;
+        }
+        video {
+            width: 100%;
+            max-width: 400px;
+            margin-top: 20px;
+            border: 1px solid #ccc;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            background: #f4f4f4;
+            margin: 5px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>QR Tech Submission App</h1>
+    <button id="start-btn">Start submitting your tech stuff</button>
+
+    <video id="video" autoplay playsinline style="display:none;"></video>
+
+    <h2>Scanned Codes</h2>
+    <p>Total Scanned: <span id="total-count">0</span></p>
+    <ul id="scanned-list"></ul>
+
+    <button id="export-btn" style="display:none;">Export as CSV</button>
+
+    <script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>
+    <script>
+        // Elements
+        const startBtn = document.getElementById('start-btn');
+        const video = document.getElementById('video');
+        const scannedList = document.getElementById('scanned-list');
+        const totalCount = document.getElementById('total-count');
+        const exportBtn = document.getElementById('export-btn');
+
+        let scannedCodes = [];
+
+        // Start the scanning process
+        startBtn.addEventListener('click', () => {
+            startBtn.style.display = 'none'; // Hide the start button
+            video.style.display = 'block'; // Show video element
+            exportBtn.style.display = 'block'; // Show export button
+
+            // Access camera
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(stream => {
+                video.srcObject = stream;
+                video.setAttribute('playsinline', true); // required for iOS
+                requestAnimationFrame(tick);
+            });
+        });
+
+        // Scanning QR codes
+        function tick() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const context = canvas.getContext('2d');
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+                if (code) {
+                    if (!scannedCodes.includes(code.data)) {
+                        scannedCodes.push(code.data);
+                        updateScannedList();
+                    }
+                }
+            }
+            requestAnimationFrame(tick);
+        }
+
+        // Update the list of scanned codes
+        function updateScannedList() {
+            scannedList.innerHTML = '';
+            scannedCodes.forEach(code => {
+                const li = document.createElement('li');
+                li.textContent = code;
+                scannedList.appendChild(li);
+            });
+            totalCount.textContent = scannedCodes.length;
+        }
+
+        // Export to CSV
+        exportBtn.addEventListener('click', () => {
+            const csvContent = "data:text/csv;charset=utf-8," + scannedCodes.join("\n");
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "scanned_tech_items.csv");
+            document.body.appendChild(link); // Required for Firefox
+            link.click();
+            document.body.removeChild(link);
+        });
+    </script>
+
+</body>
+</html>
