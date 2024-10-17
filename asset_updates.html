@@ -137,9 +137,12 @@
 
                 if (code) {
                     // Check if the scanned QR code starts with the required prefix
-                    if (code.data.startsWith(validQrPrefix) && !scannedCodes.includes(code.data)) {
-                        scannedCodes.push(code.data);
-                        updateScannedList();
+                    if (code.data.startsWith(validQrPrefix)) {
+                        const extractedValue = extractIdFromQrCode(code.data);
+                        if (extractedValue && !scannedCodes.includes(extractedValue)) {
+                            scannedCodes.push(extractedValue);
+                            updateScannedList();
+                        }
                     }
                 }
             }
