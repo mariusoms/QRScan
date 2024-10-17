@@ -146,6 +146,25 @@
             requestAnimationFrame(tick);
         }
 
+        // Function to extract the ITAM-XXXX from the QR code data
+        function extractIdFromQrCode(data) {
+            try {
+                // Extract the Base64 encoded part after the prefix
+                const base64String = data.replace(validQrPrefix, "");
+                const decodedString = atob(base64String);
+
+                // Split the decoded string and get the last part after the "/"
+                const parts = decodedString.split("/");
+                const id = parts[parts.length - 1];
+
+                // Return the formatted ID with "ITAM-" prefix
+                return "ITAM-" + id;
+            } catch (error) {
+                console.error("Error decoding QR code:", error);
+                return null; // Return null if there's an error
+            }
+        }
+
         // Update the list of scanned codes
         function updateScannedList() {
             scannedList.innerHTML = '';
