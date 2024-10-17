@@ -89,6 +89,7 @@
     <ul id="scanned-list"></ul>
 
     <button id="export-btn" style="display:none;">Export as CSV</button>
+    <button id="copy-btn" style="display:none;">Copy to Clipboard</button>
 
     <script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>
     <script>
@@ -189,6 +190,16 @@
             document.body.appendChild(link); // Required for Firefox
             link.click();
             document.body.removeChild(link);
+        });
+
+         // Copy to Clipboard
+         copyBtn.addEventListener('click', () => {
+            const textToCopy = scannedCodes.join("\n");
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                alert("Scanned codes copied to clipboard!");
+            }).catch(err => {
+                console.error("Could not copy text: ", err);
+            });
         });
 
         // Add event listener to video for refocusing on tap
