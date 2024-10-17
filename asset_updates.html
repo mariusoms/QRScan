@@ -111,33 +111,17 @@
 
         // Function to start the camera
         function startCamera() {
-    startBtn.style.display = 'none'; // Hide the start button
-    video.style.display = 'block'; // Show video element
-    exportBtn.style.display = 'block'; // Show export button
+            startBtn.style.display = 'none'; // Hide the start button
+            video.style.display = 'block'; // Show video element
+            exportBtn.style.display = 'block'; // Show export button
 
-    navigator.mediaDevices.enumerateDevices().then(devices => {
-        const videoDevices = devices.filter(device => device.kind === 'videoinput');
-        // Assuming the normal lens is typically the first video device, 
-        // though you may need to refine this based on device specifications
-        const normalCamera = videoDevices[0]; 
-
-        const constraints = {
-            video: {
-                deviceId: normalCamera.deviceId,
-                facingMode: 'environment'
-            }
-        };
-
-        navigator.mediaDevices.getUserMedia(constraints).then(newStream => {
-            stream = newStream;
-            video.srcObject = stream;
-            video.setAttribute('playsinline', true); // required for iOS
-            requestAnimationFrame(tick);
-        }).catch(error => {
-            console.error("Error accessing camera: ", error);
-        });
-    });
-}
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(newStream => {
+                stream = newStream;
+                video.srcObject = stream;
+                video.setAttribute('playsinline', true); // required for iOS
+                requestAnimationFrame(tick);
+            });
+        }
 
         // Scanning QR codes
         function tick() {
