@@ -1,0 +1,16 @@
+{
+    "name": "Stocktaking Tech Submission",
+    "short_name": "QR Tech",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#317EFB",
+    "icons": [
+      {
+        "src": "scan.png",
+        "sizes": "192x192",
+        "type": "image/png"
+      }
+    ]
+  }
+  
