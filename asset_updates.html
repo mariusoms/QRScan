@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="manifest" href="manifest.json">
-    <title>QR Tech Submission App</title>
+    <title>Submit your stocktaking technology</title>
 
     <style>
         @font-face {
@@ -80,7 +80,7 @@
 <body>
 
     <h1>QR Tech Submission App</h1>
-    <button id="start-btn">Start submitting your tech stuff</button>
+    <button id="start-btn">Start scanning your tech stuff</button>
 
     <video id="video" autoplay playsinline style="display:none;"></video>
 
@@ -101,6 +101,10 @@
 
         let scannedCodes = [];
         let stream = null; // Store the current stream
+
+        // Required QR code prefix
+        const validQrPrefix = "https://permalink.atlassian.com/v1?experience=qr-code&reference=";
+
 
         // Start the scanning process
         startBtn.addEventListener('click', startCamera);
@@ -132,7 +136,8 @@
                 const code = jsQR(imageData.data, imageData.width, imageData.height);
 
                 if (code) {
-                    if (!scannedCodes.includes(code.data)) {
+                    // Check if the scanned QR code starts with the required prefix
+                    if (code.data.startsWith(validQrPrefix) && !scannedCodes.includes(code.data)) {
                         scannedCodes.push(code.data);
                         updateScannedList();
                     }
