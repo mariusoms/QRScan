@@ -6,7 +6,6 @@
     <link rel="manifest" href="manifest.json">
     <title>QR Tech Submission App</title>
 
-    <!-- Link to Gilroy font if you host it or an alternative like Poppins -->
     <style>
         @font-face {
             font-family: 'Gilroy';
@@ -102,20 +101,24 @@
         const exportBtn = document.getElementById('export-btn');
 
         let scannedCodes = [];
+        let stream = null; // Store the current stream
 
         // Start the scanning process
-        startBtn.addEventListener('click', () => {
+        startBtn.addEventListener('click', startCamera);
+
+        // Function to start the camera
+        function startCamera() {
             startBtn.style.display = 'none'; // Hide the start button
             video.style.display = 'block'; // Show video element
             exportBtn.style.display = 'block'; // Show export button
 
-            // Access camera
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(stream => {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(newStream => {
+                stream = newStream;
                 video.srcObject = stream;
                 video.setAttribute('playsinline', true); // required for iOS
                 requestAnimationFrame(tick);
             });
-        });
+        }
 
         // Scanning QR codes
         function tick() {
@@ -160,6 +163,17 @@
             document.body.appendChild(link); // Required for Firefox
             link.click();
             document.body.removeChild(link);
+        });
+
+        // Add event listener to video for refocusing on tap
+        video.addEventListener('click', () => {
+            if (stream) {
+                // Stop the current video stream
+                stream.getTracks().forEach(track => track.stop());
+            }
+
+            // Restart the camera to refocus
+            startCamera();
         });
     </script>
 
