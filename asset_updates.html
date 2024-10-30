@@ -90,7 +90,6 @@
 
     <h1>Submit your stocktaking technology</h1>
     <button id="start-btn">Start scanning your tech stuff</button>
-    <select id="camera-select" style="display:none;"></select>
 
     <video id="video" autoplay playsinline style="display:none;"></video>
 
@@ -105,7 +104,6 @@
     <script>
         // Elements
         const startBtn = document.getElementById('start-btn');
-        const cameraSelect = document.getElementById('camera-select');
         const video = document.getElementById('video');
         const scannedList = document.getElementById('scanned-list');
         const totalCount = document.getElementById('total-count');
@@ -122,56 +120,31 @@
         // Start the scanning process
         startBtn.addEventListener('click', startCamera);
 
-        // Populate camera selection dropdown and start the camera
+        // Function to enumerate devices and start the camera
         async function startCamera() {
             startBtn.style.display = 'none';
             exportBtn.style.display = 'block';
             copyBtn.style.display = 'block';
-            cameraSelect.style.display = 'block';
 
             try {
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 const videoDevices = devices.filter(device => device.kind === 'videoinput');
 
-                // Populate the dropdown with available camera options
-                cameraSelect.innerHTML = '';
-                videoDevices.forEach((device, index) => {
-                    const option = document.createElement('option');
-                    option.value = device.deviceId;
-                    option.textContent = device.label || `Camera ${index + 1}`;
-                    cameraSelect.appendChild(option);
-                });
+                // Select the last video device as the preferred environment camera
+                const selectedDeviceId = videoDevices[videoDevices.length - 1]?.deviceId;
 
-                // Start with the first available camera by default
-                if (videoDevices.length > 0) {
-                    await openCamera(videoDevices[0].deviceId);
+                if (selectedDeviceId) {
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: { deviceId: { exact: selectedDeviceId } }
+                    });
+                    video.srcObject = stream;
+                    video.style.display = 'block';
+                    requestAnimationFrame(tick);
+                } else {
+                    console.error("No suitable video device found.");
                 }
-
-                // Listen for changes in the camera dropdown
-                cameraSelect.addEventListener('change', (event) => {
-                    openCamera(event.target.value);
-                });
             } catch (error) {
                 console.error("Error accessing the camera:", error);
-            }
-        }
-
-        // Function to open a specific camera by device ID
-        async function openCamera(deviceId) {
-            // Stop any existing stream before opening a new one
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
-
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: { deviceId: { exact: deviceId } }
-                });
-                video.srcObject = stream;
-                video.style.display = 'block';
-                requestAnimationFrame(tick);
-            } catch (error) {
-                console.error("Error opening camera:", error);
             }
         }
 
