@@ -9,7 +9,7 @@
     <style>
         @font-face {
             font-family: 'Gilroy';
-            src: url('Gilroy-Regular.otf') format('otf');
+            src: url('.\Gilroy-Regular.otf') format('otf');
         }
 
         body {
@@ -93,6 +93,9 @@
 
     <video id="video" autoplay playsinline style="display:none;"></video>
 
+    <h2>Camera Selection</h2>
+    <select id="camera-select" style="display:none;"></select>
+
     <h2>Scanned Codes</h2>
     <p>Total Scanned: <span id="total-count">0</span></p>
     <ul id="scanned-list"></ul>
@@ -109,9 +112,12 @@
         const totalCount = document.getElementById('total-count');
         const exportBtn = document.getElementById('export-btn');
         const copyBtn = document.getElementById('copy-btn');
+        const cameraSelect = document.getElementById('camera-select');
 
         let scannedCodes = [];
         let stream = null; // Store the current stream
+        let currentCameraId = null; // Store the current camera ID
+
 
         // Required QR code prefix
         const validQrPrefix = "https://permalink.atlassian.com/v1?experience=qr-code&reference=";
@@ -120,28 +126,53 @@
         // Start the scanning process
         startBtn.addEventListener('click', startCamera);
 
-        // Function to start the camera with resolution constraints
+        // Function to enumerate devices and start the camera
         async function startCamera() {
             startBtn.style.display = 'none';
             exportBtn.style.display = 'block';
             copyBtn.style.display = 'block';
+            cameraSelect.style.display = 'block'; // Show the camera select dropdown
 
             try {
-                // Request specific resolution to target the normal (non-wide) camera
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: 'environment',
-                        width: { min: 1920 },   // Set ideal width to Full HD resolution
-                        height: { min: 1080 },  // Set ideal height to Full HD resolution
-                        focusMode: 'continuous',  // Set ideal focusMode to continuous for autofocus
-                    }
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+                // Clear existing options
+                cameraSelect.innerHTML = '';
+
+                // Populate the camera select dropdown
+                videoDevices.forEach(device => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.textContent = device.label || `Camera ${cameraSelect.length + 1}`;
+                    cameraSelect.appendChild(option);
                 });
-                video.srcObject = stream;
-                video.style.display = 'block';
-                requestAnimationFrame(tick);
+
+                // Select the last device if not previously selected
+                if (!currentCameraId && videoDevices.length > 0) {
+                    currentCameraId = videoDevices[videoDevices.length - 1]?.deviceId;
+                    cameraSelect.value = currentCameraId; // Set the default value to the last camera
+                }
+
+                await startVideoStream(currentCameraId); // Start video stream with the selected camera
             } catch (error) {
                 console.error("Error accessing the camera:", error);
             }
+        }
+
+        async function startVideoStream(deviceId) {
+            // If a stream is already active, stop it
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+
+            // Start the new video stream with the selected device ID
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { deviceId: { exact: deviceId } }
+            });
+            video.srcObject = stream;
+            video.style.display = 'block';
+            requestAnimationFrame(tick);
         }
 
         // Scanning QR codes
