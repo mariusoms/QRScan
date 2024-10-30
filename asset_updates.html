@@ -253,6 +253,14 @@
             });
         });
 
+
+        // Add event listener to camera select
+        cameraSelect.addEventListener('change', (event) => {
+            currentCameraId = event.target.value; // Update current camera ID
+            startVideoStream(currentCameraId); // Restart the video stream with the new camera
+        });
+
+        
         // Add event listener to video for refocusing on tap
         video.addEventListener('click', () => {
             if (stream) {
