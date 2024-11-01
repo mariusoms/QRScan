@@ -123,8 +123,53 @@
         const validQrPrefix = "https://permalink.atlassian.com/v1?experience=qr-code&reference=";
 
 
-        // Start the scanning process
-        startBtn.addEventListener('click', startCamera);
+        // Start the app when "Start submitting your tech stuff" button is clicked
+        startBtn.addEventListener('click', checkCameraPermissions);
+
+        /**
+         * checkCameraPermissions:
+         * Checks if camera permissions are granted. If so, it calls startCamera.
+         * If not, it prompts the user for camera access.
+         */
+        async function checkCameraPermissions() {
+            try {
+                // Check the camera permission status
+                const permissionStatus = await navigator.permissions.query({ name: 'camera' });
+                
+                if (permissionStatus.state === 'granted') {
+                    // Permission granted, directly start the camera
+                    startCamera();
+                } else if (permissionStatus.state === 'prompt') {
+                    // Prompt the user for permission if not yet granted
+                    await requestCameraAccess();
+                } else {
+                    alert("Camera access is required for this app to work.");
+                }
+
+                // Re-check the permission status if it changes while the app is open
+                permissionStatus.onchange = () => { 
+                    if (permissionStatus.state === 'granted') startCamera();
+                };
+            } catch (error) {
+                console.error("Permission request failed:", error);
+            }
+        }
+
+        /**
+         * requestCameraAccess:
+         * Requests camera access if not already granted.
+         * This function opens the camera and immediately stops it to just get the permission.
+         */
+        async function requestCameraAccess() {
+            try {
+                // Request camera access by starting and stopping a video stream
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                stream.getTracks().forEach(track => track.stop());
+                startCamera(); // Start camera after permission is granted
+            } catch (error) {
+                alert("Camera access denied. Please allow camera access to use this app.");
+            }
+        }
 
         // Function to enumerate devices and start the camera
         async function startCamera() {
