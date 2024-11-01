@@ -87,7 +87,7 @@
     </style>
 
     <!-- Add ZXing library -->
-    <script src="https://unpkg.com/@zxing/library@latest"></script>
+    <script src="https://raw.githubusercontent.com/LazarSoft/jsqrcode/master/src/qr_packed.js"></script>
 </head>
 <body>
 
@@ -109,134 +109,77 @@
     <script>
         const startBtn = document.getElementById('start-btn');
         const video = document.getElementById('video');
-        const cameraSelect = document.getElementById('camera-select');
         const scannedList = document.getElementById('scanned-list');
-        const totalCount = document.getElementById('total-count');
-        let scanner = null; // ZXing scanner instance
-        let currentCameraId = null; // Store current camera ID for switching
-        const scannedCodes = []; // Store scanned codes
+        let currentStream = null;
+        const scannedCodes = [];
 
-        // Prefix for valid QR codes
+        // QR Code prefix and base64 ID extraction
         const validQrPrefix = "https://permalink.atlassian.com/v1?experience=qr-code&reference=";
 
-        // Start button click event
-        startBtn.addEventListener('click', checkCameraPermissions);
-
-        async function checkCameraPermissions() {
-            try {
-                const permissionStatus = await navigator.permissions.query({ name: 'camera' });
-                
-                if (permissionStatus.state === 'granted') {
-                    startCamera();
-                } else if (permissionStatus.state === 'prompt') {
-                    await requestCameraAccess();
-                } else {
-                    alert("Camera access is required for this app to work.");
-                }
-
-                permissionStatus.onchange = () => {
-                    if (permissionStatus.state === 'granted') startCamera();
-                };
-            } catch (error) {
-                console.error("Permission request failed:", error);
-            }
-        }
-
-        async function requestCameraAccess() {
-            try {
-                // Requesting access to video to confirm permission
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                stream.getTracks().forEach(track => track.stop());
-                startCamera();
-            } catch (error) {
-                alert("Camera access denied. Please allow camera access to use this app.");
-            }
-        }
-
-        async function startCamera() {
+        // Initialize QR code scanner
+        startBtn.addEventListener('click', () => {
             startBtn.style.display = 'none';
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const videoDevices = devices.filter(device => device.kind === 'videoinput');
-            
-            // Set the default camera to the last in the list (as per requirement)
-            if (videoDevices.length > 0) {
-                currentCameraId = videoDevices[videoDevices.length - 1].deviceId;
-            }
-
-            // Populate camera select dropdown
-            cameraSelect.innerHTML = '';
-            videoDevices.forEach(device => {
-                const option = document.createElement('option');
-                option.value = device.deviceId;
-                option.textContent = device.label || `Camera ${cameraSelect.length + 1}`;
-                cameraSelect.appendChild(option);
-            });
-
-            // Set selected camera and make it visible
-            cameraSelect.value = currentCameraId;
-            cameraSelect.style.display = 'block';
-
-            // Initialize ZXing scanner with the selected camera
-            initializeScanner(currentCameraId);
-        }
-
-        async function initializeScanner(deviceId) {
-            if (scanner) {
-                scanner.reset(); // Stop any existing scanner before switching
-            }
-
-            // Instantiate ZXing scanner and set up
-            scanner = new ZXing.BrowserQRCodeReader();
-
-            try {
-            await scanner.decodeFromVideoDevice(
-                deviceId,
-                video,
-                (result, error) => {
-                    if (result) {
-                        processQRCode(result.getText());
-                    }
-                    if (error) {
-                        console.warn("QR code not detected:", error);
-                    }
-                },
-                {
-                    video: {
-                        deviceId: { exact: deviceId },
-                        advanced: [{ focusMode: "continuous" }] // Request continuous autofocus
-                    }
-                }
-            );
-            video.style.display = 'block';
-            enableTapToFocus(); // Enable tap-to-focus after starting the camera
-        } catch (err) {
-            console.error("Error initializing scanner:", err);
-        }
-    }
-
-    /**
-     * Enable tap-to-focus functionality by listening for taps on the video element.
-     */
-     function enableTapToFocus() {
-        video.addEventListener('click', async () => {
-            try {
-                if (scanner) {
-                    // Temporarily stop and restart the scanner to trigger autofocus
-                    scanner.reset();
-                    await initializeScanner(currentCameraId); // Reinitialize scanner with autofocus
-                }
-            } catch (err) {
-                console.error("Tap to focus failed:", err);
-            }
+            startCamera();
         });
-    }
 
         /**
-         * Process the QR code data and update the scanned list if it's valid.
-         * @param {string} data - The full QR code data string.
+         * Start the camera with autofocus and begin QR code scanning.
+         */
+        async function startCamera() {
+            try {
+                // Stop any existing stream
+                if (currentStream) {
+                    currentStream.getTracks().forEach(track => track.stop());
+                }
+
+                // Request camera access with continuous autofocus
+                currentStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: "environment",
+                        focusMode: "continuous" // Request autofocus
+                    }
+                });
+
+                // Set the video source and start scanning
+                video.srcObject = currentStream;
+                video.addEventListener('loadedmetadata', () => scanQRCode());
+            } catch (error) {
+                console.error("Error accessing camera:", error);
+            }
+        }
+
+        /**
+         * Scan QR code using jsqrcode library.
+         */
+        function scanQRCode() {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+
+            const tick = () => {
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                    try {
+                        // Use jsqrcode to decode QR code
+                        const qrCodeResult = qrcode.decode(canvas);
+                        processQRCode(qrCodeResult);
+                    } catch (error) {
+                        // QR code not detected; continue scanning
+                    }
+                }
+
+                requestAnimationFrame(tick); // Continuously scan
+            };
+            tick();
+        }
+
+        /**
+         * Process the QR code result and add it to the list if valid.
+         * @param {string} data - The scanned QR code data.
          */
         function processQRCode(data) {
-            // Check for valid prefix and extract the ID if valid
             if (data.startsWith(validQrPrefix)) {
                 const extractedValue = extractIdFromQrCode(data);
                 if (extractedValue && !scannedCodes.includes(extractedValue)) {
@@ -265,7 +208,7 @@
         }
 
         /**
-         * Update the scanned codes list display and the count.
+         * Update the scanned codes list display.
          */
         function updateScannedList() {
             scannedList.innerHTML = '';
@@ -274,7 +217,6 @@
                 li.textContent = code;
                 scannedList.appendChild(li);
             });
-            totalCount.textContent = scannedCodes.length;
         }
 
     </script>
