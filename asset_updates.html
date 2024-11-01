@@ -305,17 +305,6 @@
             startVideoStream(currentCameraId); // Restart the video stream with the new camera
         });
 
-        
-        // Add event listener to video for refocusing on tap
-        video.addEventListener('click', () => {
-            if (stream) {
-                // Stop the current video stream
-                stream.getTracks().forEach(track => track.stop());
-            }
-
-            // Restart the camera to refocus
-            startCamera();
-        });
     </script>
 
 </body>
