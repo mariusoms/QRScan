@@ -213,7 +213,9 @@
 
             // Start the new video stream with the selected device ID
             stream = await navigator.mediaDevices.getUserMedia({
-                video: { deviceId: { exact: deviceId } }
+                video: { deviceId: { exact: deviceId },
+                         advanced: [{ focusMode: "continuous" }] 
+                        }
             });
             video.srcObject = stream;
             video.style.display = 'block';
