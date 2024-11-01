@@ -5,6 +5,87 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QR Tech Submission App</title>
 
+
+    <style>
+        @font-face {
+            font-family: 'Gilroy';
+            src: url('.\Gilroy-Regular.otf') format('otf');
+        }
+
+        body {
+            font-family: 'Gilroy', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f9f9f9;
+            color: #15355B;
+            text-align: center;
+        }
+
+        h1 {
+            color: #DD251D;
+        }
+
+        button {
+            background-color: #DD251D;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            font-size: 18px;
+            cursor: pointer;
+            border-radius: 5px;
+            margin: 10px;
+        }
+
+        button:hover {
+            background-color: #C71F1A;
+        }
+
+        video {
+            width: 100%;
+            max-width: 400px;
+            margin-top: 20px;
+            border: 2px solid #15355B;
+            border-radius: 5px;
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+            margin-top: 20px;
+        }
+
+        li {
+            background: #f4f4f4;
+            margin: 5px;
+            padding: 10px;
+            border-radius: 4px;
+            color: #15355B;
+            border-left: 4px solid #DD251D;
+        }
+
+        #total-count {
+            color: #15355B;
+            font-size: 24px;
+        }
+
+        #export-btn {
+            background-color: #15355B;
+        }
+
+        #export-btn:hover {
+            background-color: #122A46;
+        }
+
+        #copy-btn {
+            background-color: #15355B;
+        }
+
+        #copy-btn:hover {
+            background-color: #122A46;
+        }
+
+    </style>
+
     <!-- Add ZXing library -->
     <script src="https://unpkg.com/@zxing/library@latest"></script>
 </head>
@@ -108,20 +189,47 @@
             scanner = new ZXing.BrowserQRCodeReader();
 
             try {
-                // Bind the video element and start scanning
-                await scanner.decodeFromVideoDevice(deviceId, video, (result, error) => {
+            await scanner.decodeFromVideoDevice(
+                deviceId,
+                video,
+                (result, error) => {
                     if (result) {
                         processQRCode(result.getText());
                     }
                     if (error) {
                         console.warn("QR code not detected:", error);
                     }
-                });
-                video.style.display = 'block'; // Show the video element on success
-            } catch (err) {
-                console.error("Error initializing scanner:", err);
-            }
+                },
+                {
+                    video: {
+                        deviceId: { exact: deviceId },
+                        advanced: [{ focusMode: "continuous" }] // Request continuous autofocus
+                    }
+                }
+            );
+            video.style.display = 'block';
+            enableTapToFocus(); // Enable tap-to-focus after starting the camera
+        } catch (err) {
+            console.error("Error initializing scanner:", err);
         }
+    }
+
+    /**
+     * Enable tap-to-focus functionality by listening for taps on the video element.
+     */
+     function enableTapToFocus() {
+        video.addEventListener('click', async () => {
+            try {
+                if (scanner) {
+                    // Temporarily stop and restart the scanner to trigger autofocus
+                    scanner.reset();
+                    await initializeScanner(currentCameraId); // Reinitialize scanner with autofocus
+                }
+            } catch (err) {
+                console.error("Tap to focus failed:", err);
+            }
+        });
+    }
 
         /**
          * Process the QR code data and update the scanned list if it's valid.
