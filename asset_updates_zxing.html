@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Tech Submission App</title>
+
+    <!-- Add ZXing library -->
+    <script src="https://unpkg.com/@zxing/library@latest"></script>
+</head>
+<body>
+
+    <h1>QR Tech Submission App</h1>
+    <button id="start-btn">Start submitting your tech stuff</button>
+
+    <!-- Video element to display camera stream -->
+    <video id="video" autoplay playsinline style="display:none;"></video>
+
+    <h2>Camera Selection</h2>
+    <select id="camera-select" style="display:none;"></select>
+
+    <h2>Scanned Codes</h2>
+    <p>Total Scanned: <span id="total-count">0</span></p>
+    <ul id="scanned-list"></ul>
+    <button id="export-btn" style="display:none;">Export as CSV</button>
+    <button id="copy-btn" style="display:none;">Copy to Clipboard</button>
+
+    <script>
+        const startBtn = document.getElementById('start-btn');
+        const video = document.getElementById('video');
+        const cameraSelect = document.getElementById('camera-select');
+        const scannedList = document.getElementById('scanned-list');
+        const totalCount = document.getElementById('total-count');
+        let scanner = null; // ZXing scanner instance
+        let currentCameraId = null; // Store current camera ID for switching
+        const scannedCodes = []; // Store scanned codes
+
+        // Prefix for valid QR codes
+        const validQrPrefix = "https://permalink.atlassian.com/v1?experience=qr-code&reference=";
+
+        // Start button click event
+        startBtn.addEventListener('click', checkCameraPermissions);
+
+        async function checkCameraPermissions() {
+            try {
+                const permissionStatus = await navigator.permissions.query({ name: 'camera' });
+                
+                if (permissionStatus.state === 'granted') {
+                    startCamera();
+                } else if (permissionStatus.state === 'prompt') {
+                    await requestCameraAccess();
+                } else {
+                    alert("Camera access is required for this app to work.");
+                }
+
+                permissionStatus.onchange = () => {
+                    if (permissionStatus.state === 'granted') startCamera();
+                };
+            } catch (error) {
+                console.error("Permission request failed:", error);
+            }
+        }
+
+        async function requestCameraAccess() {
+            try {
+                // Requesting access to video to confirm permission
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                stream.getTracks().forEach(track => track.stop());
+                startCamera();
+            } catch (error) {
+                alert("Camera access denied. Please allow camera access to use this app.");
+            }
+        }
+
+        async function startCamera() {
+            startBtn.style.display = 'none';
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            
+            // Set the default camera to the last in the list (as per requirement)
+            if (videoDevices.length > 0) {
+                currentCameraId = videoDevices[videoDevices.length - 1].deviceId;
+            }
+
+            // Populate camera select dropdown
+            cameraSelect.innerHTML = '';
+            videoDevices.forEach(device => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                option.textContent = device.label || `Camera ${cameraSelect.length + 1}`;
+                cameraSelect.appendChild(option);
+            });
+
+            // Set selected camera and make it visible
+            cameraSelect.value = currentCameraId;
+            cameraSelect.style.display = 'block';
+
+            // Initialize ZXing scanner with the selected camera
+            initializeScanner(currentCameraId);
+        }
+
+        async function initializeScanner(deviceId) {
+            if (scanner) {
+                scanner.reset(); // Stop any existing scanner before switching
+            }
+
+            // Instantiate ZXing scanner and set up
+            scanner = new ZXing.BrowserQRCodeReader();
+
+            try {
+                // Bind the video element and start scanning
+                await scanner.decodeFromVideoDevice(deviceId, video, (result, error) => {
+                    if (result) {
+                        processQRCode(result.getText());
+                    }
+                    if (error) {
+                        console.warn("QR code not detected:", error);
+                    }
+                });
+                video.style.display = 'block'; // Show the video element on success
+            } catch (err) {
+                console.error("Error initializing scanner:", err);
+            }
+        }
+
+        /**
+         * Process the QR code data and update the scanned list if it's valid.
+         * @param {string} data - The full QR code data string.
+         */
+        function processQRCode(data) {
+            // Check for valid prefix and extract the ID if valid
+            if (data.startsWith(validQrPrefix)) {
+                const extractedValue = extractIdFromQrCode(data);
+                if (extractedValue && !scannedCodes.includes(extractedValue)) {
+                    scannedCodes.push(extractedValue);
+                    updateScannedList();
+                }
+            }
+        }
+
+        /**
+         * Extract the ITAM-ID from the base64 portion of the QR code data.
+         * @param {string} data - The full QR code data string.
+         * @returns {string|null} - Returns the formatted ITAM-ID or null on failure.
+         */
+        function extractIdFromQrCode(data) {
+            try {
+                const base64String = data.replace(validQrPrefix, "");
+                const decodedString = atob(base64String);
+                const parts = decodedString.split("/");
+                const id = parts[parts.length - 1];
+                return "ITAM-" + id;
+            } catch (error) {
+                console.error("Error decoding QR code:", error);
+                return null;
+            }
+        }
+
+        /**
+         * Update the scanned codes list display and the count.
+         */
+        function updateScannedList() {
+            scannedList.innerHTML = '';
+            scannedCodes.forEach(code => {
+                const li = document.createElement('li');
+                li.textContent = code;
+                scannedList.appendChild(li);
+            });
+            totalCount.textContent = scannedCodes.length;
+        }
+
+    </script>
+
+</body>
+</html>
