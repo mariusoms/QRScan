@@ -104,177 +104,172 @@
 
     <!-- Include ZXing library -->
     <script src="https://unpkg.com/@zxing/library@latest"></script>
-    <script>
-        const startBtn = document.getElementById('start-btn');
-        const video = document.getElementById('video');
-        const scannedList = document.getElementById('scanned-list');
-        const totalCount = document.getElementById('total-count');
-        const exportBtn = document.getElementById('export-btn');
-        const copyBtn = document.getElementById('copy-btn');
-        const cameraSelect = document.getElementById('camera-select');
+<script>
+    const startBtn = document.getElementById('start-btn');
+    const video = document.getElementById('video');
+    const scannedList = document.getElementById('scanned-list');
+    const totalCount = document.getElementById('total-count');
+    const exportBtn = document.getElementById('export-btn');
+    const copyBtn = document.getElementById('copy-btn');
+    const cameraSelect = document.getElementById('camera-select');
 
-        let scannedCodes = [];
-        let stream = null;
-        let currentCameraId = null;
+    let scannedCodes = [];
+    let stream = null;
+    let currentCameraId = null;
 
-        const validQrPrefix = "https://permalink.atlassian.com/v1?experience=qr-code&reference=";
-        
-        // ZXing setup
-        const codeReader = new ZXing.BrowserMultiFormatReader();
+    const validQrPrefix = "https://permalink.atlassian.com/v1?experience=qr-code&reference=";
+    
+    // Initialize ZXing QR code reader
+    const codeReader = new ZXing.BrowserMultiFormatReader();
 
-        startBtn.addEventListener('click', checkCameraPermissions);
+    startBtn.addEventListener('click', checkCameraPermissions);
 
-        async function checkCameraPermissions() {
-            try {
-                const permissionStatus = await navigator.permissions.query({ name: 'camera' });
-                
-                if (permissionStatus.state === 'granted') {
-                    startCamera();
-                } else if (permissionStatus.state === 'prompt') {
-                    await requestCameraAccess();
-                } else {
-                    alert("Camera access is required for this app to work.");
-                }
-
-                permissionStatus.onchange = () => { 
-                    if (permissionStatus.state === 'granted') startCamera();
-                };
-            } catch (error) {
-                console.error("Permission request failed:", error);
-            }
-        }
-
-        async function requestCameraAccess() {
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                stream.getTracks().forEach(track => track.stop());
+    async function checkCameraPermissions() {
+        try {
+            const permissionStatus = await navigator.permissions.query({ name: 'camera' });
+            
+            if (permissionStatus.state === 'granted') {
                 startCamera();
-            } catch (error) {
-                alert("Camera access denied. Please allow camera access to use this app.");
+            } else if (permissionStatus.state === 'prompt') {
+                await requestCameraAccess();
+            } else {
+                alert("Camera access is required for this app to work.");
             }
-        }
 
-        async function startCamera() {
-            startBtn.style.display = 'none';
-            exportBtn.style.display = 'block';
-            copyBtn.style.display = 'block';
+            permissionStatus.onchange = () => { 
+                if (permissionStatus.state === 'granted') startCamera();
+            };
+        } catch (error) {
+            console.error("Permission request failed:", error);
+        }
+    }
+
+    async function requestCameraAccess() {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            stream.getTracks().forEach(track => track.stop());
+            startCamera();
+        } catch (error) {
+            alert("Camera access denied. Please allow camera access to use this app.");
+        }
+    }
+
+    async function startCamera() {
+        startBtn.style.display = 'none';
+        exportBtn.style.display = 'block';
+        copyBtn.style.display = 'block';
+        cameraSelect.style.display = 'block';
+
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+            if (videoDevices.length > 0) {
+                currentCameraId = videoDevices[videoDevices.length - 1].deviceId;
+            }
+
+            videoDevices.forEach(device => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                option.textContent = device.label || `Camera ${cameraSelect.length + 1}`;
+                cameraSelect.appendChild(option);
+            });
+
+            cameraSelect.value = currentCameraId;
             cameraSelect.style.display = 'block';
 
-            try {
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            await startVideoStream(currentCameraId);
+        } catch (error) {
+            console.error("Error accessing the camera:", error);
+        }
+    }
 
-                if (videoDevices.length > 0) {
-                    currentCameraId = videoDevices[videoDevices.length - 1].deviceId;
+    async function startVideoStream(deviceId) {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+        }
+
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: { deviceId: { exact: deviceId },
+                     advanced: [{ focusMode: "continuous" },
+                                { zoom: 3.0 }
+                     ] 
+                    }
+        });
+        video.srcObject = stream;
+        video.style.display = 'block';
+        requestAnimationFrame(tick);
+    }
+
+    function tick() {
+        codeReader.decodeFromVideoElement(video)
+            .then(result => {
+                if (result) {
+                    const codeData = result.text;
+
+                    // Verify if the scanned code starts with the required prefix
+                    if (codeData.startsWith(validQrPrefix)) {
+                        const extractedValue = extractIdFromQrCode(codeData);
+                        if (extractedValue && !scannedCodes.includes(extractedValue)) {
+                            scannedCodes.push(extractedValue);
+                            updateScannedList();
+                        }
+                    }
                 }
-
-                videoDevices.forEach(device => {
-                    const option = document.createElement('option');
-                    option.value = device.deviceId;
-                    option.textContent = device.label || `Camera ${cameraSelect.length + 1}`;
-                    cameraSelect.appendChild(option);
-                });
-
-                cameraSelect.value = currentCameraId;
-                cameraSelect.style.display = 'block';
-
-                await startVideoStream(currentCameraId);
-            } catch (error) {
-                console.error("Error accessing the camera:", error);
-            }
-        }
-
-        async function startVideoStream(deviceId) {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
-
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: { deviceId: { exact: deviceId },
-                         advanced: [{ focusMode: "continuous" },
-                                    { zoom: 3.0 }
-                         ] 
-                        }
+                requestAnimationFrame(tick); // Continue scanning after processing the result
+            })
+            .catch(err => {
+                console.error("QR code detection error:", err);
+                requestAnimationFrame(tick); // Continue scanning even if there's an error
             });
-            video.srcObject = stream;
-            video.style.display = 'block';
-            requestAnimationFrame(tick);
-        }
+    }
 
-        function tick() {
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                codeReader.decodeFromVideoElement(video)
-                    .then(result => {
-                        if (result) {
-                            const codeData = result.text;
-                            if (codeData.startsWith(validQrPrefix)) {
-                                const extractedValue = extractIdFromQrCode(codeData);
-                                if (extractedValue && !scannedCodes.includes(extractedValue)) {
-                                    scannedCodes.push(extractedValue);
-                                    updateScannedList();
-                                }
-                            }
-                        }
-                        requestAnimationFrame(tick);
-                    })
-                    .catch(err => {
-                        console.error("QR code detection error:", err);
-                        requestAnimationFrame(tick);
-                    });
-            } else {
-                requestAnimationFrame(tick);
-            }
+    function extractIdFromQrCode(data) {
+        try {
+            const base64String = data.replace(validQrPrefix, "");
+            const decodedString = atob(base64String);
+            const parts = decodedString.split("/");
+            const id = parts[parts.length - 1];
+            return "ITAM-" + id;
+        } catch (error) {
+            console.error("Error decoding QR code:", error);
+            return null;
         }
+    }
 
-        function extractIdFromQrCode(data) {
-            try {
-                const base64String = data.replace(validQrPrefix, "");
-                const decodedString = atob(base64String);
-                const parts = decodedString.split("/");
-                const id = parts[parts.length - 1];
-                return "ITAM-" + id;
-            } catch (error) {
-                console.error("Error decoding QR code:", error);
-                return null;
-            }
-        }
-
-        function updateScannedList() {
-            scannedList.innerHTML = '';
-            scannedCodes.forEach(code => {
-                const li = document.createElement('li');
-                li.textContent = code;
-                scannedList.appendChild(li);
-            });
-            totalCount.textContent = scannedCodes.length;
-        }
-
-        exportBtn.addEventListener('click', () => {
-            const csvContent = "data:text/csv;charset=utf-8," + scannedCodes.join("\n");
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "scanned_tech_items.csv");
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+    function updateScannedList() {
+        scannedList.innerHTML = '';
+        scannedCodes.forEach(code => {
+            const li = document.createElement('li');
+            li.textContent = code;
+            scannedList.appendChild(li);
         });
+        totalCount.textContent = scannedCodes.length;
+    }
 
-        copyBtn.addEventListener('click', () => {
-            const textToCopy = scannedCodes.join("\n");
-            navigator.clipboard.writeText(textToCopy).then(() => {
-                alert("Scanned codes copied to clipboard!");
-            }).catch(err => {
-                console.error("Could not copy text: ", err);
-            });
+    exportBtn.addEventListener('click', () => {
+        const csvContent = "data:text/csv;charset=utf-8," + scannedCodes.join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "scanned_tech_items.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
+
+    copyBtn.addEventListener('click', () => {
+        const textToCopy = scannedCodes.join("\n");
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            alert("Scanned codes copied to clipboard!");
+        }).catch(err => {
+            console.error("Could not copy text: ", err);
         });
+    });
 
-        cameraSelect.addEventListener('change', (event) => {
-            currentCameraId = event.target.value;
-            startVideoStream(currentCameraId);
-        });
+    cameraSelect.addEventListener('change', (event) => {
+        currentCameraId = event.target.value;
+        startVideoStream(currentCameraId);
+    });
 
-    </script>
-
-</body>
-</html>
+</script>
