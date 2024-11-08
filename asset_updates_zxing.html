@@ -3,109 +3,154 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR Tech Submission App with jsqrcode</title>
-    
-    <!-- Include jsqrcode library -->
-    <script src="https://raw.githubusercontent.com/LazarSoft/jsqrcode/master/src/qr_packed.js"></script>
+    <link rel="manifest" href="manifest.json">
+    <title>Submit your stocktaking technology</title>
+
+    <style>
+        /* Your existing CSS styles */
+    </style>
 </head>
 <body>
-    <h1>QR Tech Submission App</h1>
-    <button id="start-btn">Start submitting your tech stuff</button>
 
-    <video id="video" autoplay playsinline></video>
+    <h1>Submit your stocktaking technology</h1>
+    <button id="start-btn">Start scanning your tech stuff</button>
+
+    <video id="video" autoplay playsinline style="display:none;"></video>
+
+    <h2>Camera Selection</h2>
+    <select id="camera-select" style="display:none;"></select>
 
     <h2>Scanned Codes</h2>
+    <p>Total Scanned: <span id="total-count">0</span></p>
     <ul id="scanned-list"></ul>
-    <button id="export-btn" style="display:none;">Export as CSV</button>
 
+    <button id="export-btn" style="display:none;">Export as CSV</button>
+    <button id="copy-btn" style="display:none;">Copy to Clipboard</button>
+
+    <!-- Include ZXing library -->
+    <script src="https://unpkg.com/@zxing/library@latest"></script>
     <script>
         const startBtn = document.getElementById('start-btn');
         const video = document.getElementById('video');
         const scannedList = document.getElementById('scanned-list');
-        let currentStream = null;
-        const scannedCodes = [];
+        const totalCount = document.getElementById('total-count');
+        const exportBtn = document.getElementById('export-btn');
+        const copyBtn = document.getElementById('copy-btn');
+        const cameraSelect = document.getElementById('camera-select');
 
-        // QR Code prefix and base64 ID extraction
+        let scannedCodes = [];
+        let stream = null;
+        let currentCameraId = null;
+
         const validQrPrefix = "https://permalink.atlassian.com/v1?experience=qr-code&reference=";
+        
+        // ZXing setup
+        const codeReader = new ZXing.BrowserMultiFormatReader();
 
-        // Initialize QR code scanner
-        startBtn.addEventListener('click', () => {
-            startBtn.style.display = 'none';
-            startCamera();
-        });
+        startBtn.addEventListener('click', checkCameraPermissions);
 
-        /**
-         * Start the camera with autofocus and begin QR code scanning.
-         */
-        async function startCamera() {
+        async function checkCameraPermissions() {
             try {
-                // Stop any existing stream
-                if (currentStream) {
-                    currentStream.getTracks().forEach(track => track.stop());
+                const permissionStatus = await navigator.permissions.query({ name: 'camera' });
+                
+                if (permissionStatus.state === 'granted') {
+                    startCamera();
+                } else if (permissionStatus.state === 'prompt') {
+                    await requestCameraAccess();
+                } else {
+                    alert("Camera access is required for this app to work.");
                 }
 
-                // Request camera access with continuous autofocus
-                currentStream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: "environment",
-                        focusMode: "continuous" // Request autofocus
-                    }
+                permissionStatus.onchange = () => { 
+                    if (permissionStatus.state === 'granted') startCamera();
+                };
+            } catch (error) {
+                console.error("Permission request failed:", error);
+            }
+        }
+
+        async function requestCameraAccess() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                stream.getTracks().forEach(track => track.stop());
+                startCamera();
+            } catch (error) {
+                alert("Camera access denied. Please allow camera access to use this app.");
+            }
+        }
+
+        async function startCamera() {
+            startBtn.style.display = 'none';
+            exportBtn.style.display = 'block';
+            copyBtn.style.display = 'block';
+            cameraSelect.style.display = 'block';
+
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+                if (videoDevices.length > 0) {
+                    currentCameraId = videoDevices[videoDevices.length - 1].deviceId;
+                }
+
+                videoDevices.forEach(device => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.textContent = device.label || `Camera ${cameraSelect.length + 1}`;
+                    cameraSelect.appendChild(option);
                 });
 
-                // Set the video source and start scanning
-                video.srcObject = currentStream;
-                video.addEventListener('loadedmetadata', () => scanQRCode());
+                cameraSelect.value = currentCameraId;
+                cameraSelect.style.display = 'block';
+
+                await startVideoStream(currentCameraId);
             } catch (error) {
-                console.error("Error accessing camera:", error);
+                console.error("Error accessing the camera:", error);
             }
         }
 
-        /**
-         * Scan QR code using jsqrcode library.
-         */
-        function scanQRCode() {
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
+        async function startVideoStream(deviceId) {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
 
-            const tick = () => {
-                if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-                    try {
-                        // Use jsqrcode to decode QR code
-                        const qrCodeResult = qrcode.decode(canvas);
-                        processQRCode(qrCodeResult);
-                    } catch (error) {
-                        // QR code not detected; continue scanning
-                    }
-                }
-
-                requestAnimationFrame(tick); // Continuously scan
-            };
-            tick();
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { deviceId: { exact: deviceId },
+                         advanced: [{ focusMode: "continuous" },
+                                    { zoom: 3.0 }
+                         ] 
+                        }
+            });
+            video.srcObject = stream;
+            video.style.display = 'block';
+            requestAnimationFrame(tick);
         }
 
-        /**
-         * Process the QR code result and add it to the list if valid.
-         * @param {string} data - The scanned QR code data.
-         */
-        function processQRCode(data) {
-            if (data.startsWith(validQrPrefix)) {
-                const extractedValue = extractIdFromQrCode(data);
-                if (extractedValue && !scannedCodes.includes(extractedValue)) {
-                    scannedCodes.push(extractedValue);
-                    updateScannedList();
-                }
+        function tick() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                codeReader.decodeFromVideoElement(video)
+                    .then(result => {
+                        if (result) {
+                            const codeData = result.text;
+                            if (codeData.startsWith(validQrPrefix)) {
+                                const extractedValue = extractIdFromQrCode(codeData);
+                                if (extractedValue && !scannedCodes.includes(extractedValue)) {
+                                    scannedCodes.push(extractedValue);
+                                    updateScannedList();
+                                }
+                            }
+                        }
+                        requestAnimationFrame(tick);
+                    })
+                    .catch(err => {
+                        console.error("QR code detection error:", err);
+                        requestAnimationFrame(tick);
+                    });
+            } else {
+                requestAnimationFrame(tick);
             }
         }
 
-        /**
-         * Extract the ITAM-ID from the base64 portion of the QR code data.
-         * @param {string} data - The full QR code data string.
-         * @returns {string|null} - Returns the formatted ITAM-ID or null on failure.
-         */
         function extractIdFromQrCode(data) {
             try {
                 const base64String = data.replace(validQrPrefix, "");
@@ -119,9 +164,6 @@
             }
         }
 
-        /**
-         * Update the scanned codes list display.
-         */
         function updateScannedList() {
             scannedList.innerHTML = '';
             scannedCodes.forEach(code => {
@@ -129,8 +171,35 @@
                 li.textContent = code;
                 scannedList.appendChild(li);
             });
+            totalCount.textContent = scannedCodes.length;
         }
 
+        exportBtn.addEventListener('click', () => {
+            const csvContent = "data:text/csv;charset=utf-8," + scannedCodes.join("\n");
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "scanned_tech_items.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+        copyBtn.addEventListener('click', () => {
+            const textToCopy = scannedCodes.join("\n");
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                alert("Scanned codes copied to clipboard!");
+            }).catch(err => {
+                console.error("Could not copy text: ", err);
+            });
+        });
+
+        cameraSelect.addEventListener('change', (event) => {
+            currentCameraId = event.target.value;
+            startVideoStream(currentCameraId);
+        });
+
     </script>
+
 </body>
 </html>
