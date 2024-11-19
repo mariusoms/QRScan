@@ -84,6 +84,12 @@
             background-color: #122A46;
         }
 
+        /* Add a green border to indicate a successful scan */
+    .feedback-blink {
+        border: 5px solid green;
+        transition: border 0.2s ease-in-out;
+    }
+
     </style>
 </head>
 <body>
@@ -308,6 +314,40 @@
             currentCameraId = event.target.value; // Update current camera ID
             startVideoStream(currentCameraId); // Restart the video stream with the new camera
         });
+
+
+        /**
+     * Process the QR code data and update the scanned list if it's valid.
+     * Provides visual and vibration feedback when a new item is added.
+     * @param {string} data - The full QR code data string.
+     */
+    function processQRCode(data) {
+        // Check for valid prefix and extract the ID if valid
+        if (data.startsWith(validQrPrefix)) {
+            const extractedValue = extractIdFromQrCode(data);
+            if (extractedValue && !scannedCodes.includes(extractedValue)) {
+                scannedCodes.push(extractedValue);
+                updateScannedList();
+
+                // Trigger feedback for successful scan
+                triggerFeedback();
+            }
+        }
+    }
+
+    /**
+     * Trigger visual and vibration feedback when a QR code is successfully scanned.
+     */
+    function triggerFeedback() {
+        // Add a green border to the video element
+        video.classList.add('feedback-blink');
+        setTimeout(() => video.classList.remove('feedback-blink'), 200); // Remove the class after 200ms
+
+        // Vibrate for 200ms if supported
+        if (navigator.vibrate) {
+            navigator.vibrate(200);
+        }
+    }
 
     </script>
 
