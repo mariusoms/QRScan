@@ -326,11 +326,11 @@
     function triggerFeedback() {
         // Add a green border to the video element
         video.classList.add('feedback-blink');
-        setTimeout(() => video.classList.remove('feedback-blink'), 200); // Remove the class after 200ms
+        setTimeout(() => video.classList.remove('feedback-blink'), 800); // Remove the class after 800ms
 
-        // Vibrate for 800ms if supported
+        // Vibrate for 200ms if supported
         if (navigator.vibrate) {
-            navigator.vibrate(800);
+            navigator.vibrate(200);
         }
     }
 
