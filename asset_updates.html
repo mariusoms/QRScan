@@ -90,6 +90,33 @@
         transition: border 0.2s ease-in-out;
     }
 
+
+    /* Flash overlay styling */
+    #flash-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(circle, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 70%);
+        pointer-events: none; /* Allow clicks to pass through */
+        opacity: 0; /* Initially hidden */
+        animation: none;
+        z-index: 999; /* On top of everything */
+    }
+
+    /* Flash animation */
+    @keyframes flashEffect {
+        0% {
+            opacity: 1;
+            transform: scale(1);
+        }
+        100% {
+            opacity: 0;
+            transform: scale(1.5);
+        }
+    }
+
     </style>
 </head>
 <body>
@@ -108,6 +135,8 @@
 
     <button id="export-btn" style="display:none;">Export as CSV</button>
     <button id="copy-btn" style="display:none;">Copy to Clipboard</button>
+
+    <div id="flash-overlay"></div>
 
     <script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>
     <script>
@@ -251,7 +280,7 @@
                             updateScannedList();
 
                             // Trigger feedback for successful scan
-                            triggerFeedback();
+                            triggerFlashEffect();
                         }
                     }
                 }
@@ -321,18 +350,14 @@
 
 
     /**
-     * Trigger visual and vibration feedback when a QR code is successfully scanned.
-     */
-    function triggerFeedback() {
-        // Add a green border to the video element
-        video.classList.add('feedback-blink');
-        setTimeout(() => video.classList.remove('feedback-blink'), 800); // Remove the class after 800ms
-
-        // Vibrate for 200ms if supported
-        if (navigator.vibrate) {
-            navigator.vibrate(200);
-        }
-    }
+ * Trigger the flash effect for visual feedback.
+ */
+function triggerFlashEffect() {
+    const flashOverlay = document.getElementById('flash-overlay');
+    flashOverlay.style.animation = 'none'; // Reset animation
+    void flashOverlay.offsetWidth; // Trigger reflow to restart animation
+    flashOverlay.style.animation = 'flashEffect 0.5s ease-out';
+}
 
     </script>
 
