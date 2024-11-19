@@ -249,6 +249,9 @@
                         if (extractedValue && !scannedCodes.includes(extractedValue)) {
                             scannedCodes.push(extractedValue);
                             updateScannedList();
+
+                            // Trigger feedback for successful scan
+                            triggerFeedback();
                         }
                     }
                 }
@@ -316,24 +319,6 @@
         });
 
 
-        /**
-     * Process the QR code data and update the scanned list if it's valid.
-     * Provides visual and vibration feedback when a new item is added.
-     * @param {string} data - The full QR code data string.
-     */
-    function processQRCode(data) {
-        // Check for valid prefix and extract the ID if valid
-        if (data.startsWith(validQrPrefix)) {
-            const extractedValue = extractIdFromQrCode(data);
-            if (extractedValue && !scannedCodes.includes(extractedValue)) {
-                scannedCodes.push(extractedValue);
-                updateScannedList();
-
-                // Trigger feedback for successful scan
-                triggerFeedback();
-            }
-        }
-    }
 
     /**
      * Trigger visual and vibration feedback when a QR code is successfully scanned.
