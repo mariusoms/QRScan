@@ -328,9 +328,9 @@
         video.classList.add('feedback-blink');
         setTimeout(() => video.classList.remove('feedback-blink'), 200); // Remove the class after 200ms
 
-        // Vibrate for 200ms if supported
+        // Vibrate for 800ms if supported
         if (navigator.vibrate) {
-            navigator.vibrate(200);
+            navigator.vibrate(800);
         }
     }
 
