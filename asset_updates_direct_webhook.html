@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
+    <title>Submit your stocktaking technology</title>
+
+    <style>
+        @font-face {
+            font-family: 'Gilroy';
+            src: url('.\Gilroy-Regular.otf') format('otf');
+        }
+
+        body {
+            font-family: 'Gilroy', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f9f9f9;
+            color: #15355B;
+            text-align: center;
+        }
+
+        h1 {
+            color: #DD251D;
+        }
+
+        button {
+            background-color: #DD251D;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            font-size: 18px;
+            cursor: pointer;
+            border-radius: 5px;
+            margin: 10px;
+        }
+
+        button:hover {
+            background-color: #C71F1A;
+        }
+
+        video {
+            width: 100%;
+            max-width: 400px;
+            margin-top: 20px;
+            border: 2px solid #15355B;
+            border-radius: 5px;
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+            margin-top: 20px;
+        }
+
+        li {
+            background: #f4f4f4;
+            margin: 5px;
+            padding: 10px;
+            border-radius: 4px;
+            color: #15355B;
+            border-left: 4px solid #DD251D;
+        }
+
+        #total-count {
+            color: #15355B;
+            font-size: 24px;
+        }
+
+        #export-btn {
+            background-color: #15355B;
+        }
+
+        #export-btn:hover {
+            background-color: #122A46;
+        }
+
+        #copy-btn {
+            background-color: #15355B;
+        }
+
+        #copy-btn:hover {
+            background-color: #122A46;
+        }
+
+        #submit-btn {
+        background-color: #15355B; /* Blue */
+        color: white;
+        }
+
+        #submit-btn:hover {
+        background-color: #122c4b; /* Darker Blue on Hover */
+        }
+
+        /* Add Input fields and greyed out start button */
+
+        #inputs-container {
+        margin-bottom: 20px;
+    }
+
+    #inputs-container label {
+        font-family: 'Gilroy', sans-serif;
+        color: #15355B;
+        font-weight: bold;
+        margin-right: 10px;
+    }
+
+    #inputs-container input {
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        font-family: 'Gilroy', sans-serif;
+        margin-bottom: 10px;
+    }
+
+    #start-btn:disabled {
+        background-color: grey;
+        cursor: not-allowed;
+    }
+
+    #start-btn {
+        padding: 10px 20px;
+        color: white;
+        font-family: 'Gilroy', sans-serif;
+        font-size: 16px;
+        border: none;
+        border-radius: 5px;
+        background-color: #DD251D; /* Default red color */
+        cursor: pointer;
+    }
+
+        /* Add a green border to indicate a successful scan */
+    .feedback-blink {
+        border: 5px solid green;
+        transition: border 0.2s ease-in-out;
+    }
+
+
+    /* Flash overlay styling */
+    #flash-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(circle, rgba(255, 255, 255, 1) 70%, rgba(255, 255, 255, 0) 70%);
+        pointer-events: none; /* Allow clicks to pass through */
+        opacity: 0; /* Initially hidden */
+        animation: none;
+        z-index: 999; /* On top of everything */
+    }
+
+    /* Flash animation */
+    @keyframes flashEffect {
+        0% {
+            opacity: 1;
+            transform: scale(1);
+        }
+        100% {
+            opacity: 0;
+            transform: scale(4.5);
+        }
+    }
+
+    </style>
+</head>
+<body>
+
+    <h1>Submit your stocktaking technology</h1>
+    <button id="start-btn">Start scanning your tech stuff</button>
+
+    <!-- Input fields for Team and Customer -->
+    <div id="inputs-container">
+        <div>
+            <label for="team-input">Team:</label>
+            <input type="text" id="team-input" placeholder="Enter team name">
+        </div>
+        <div>
+            <label for="customer-input">Customer:</label>
+            <input type="text" id="customer-input" placeholder="Enter customer name">
+        </div>
+    </div>
+    
+    <!-- Updated Start Button -->
+    <button id="start-btn" style="background-color: grey;" disabled>Start Scanning Your Tech Stuff</button>
+
+
+    <video id="video" autoplay playsinline style="display:none;"></video>
+
+    <h2>Camera Selection</h2>
+    <select id="camera-select" style="display:none;"></select>
+
+    <h2>Scanned Codes</h2>
+    <p>Total Scanned: <span id="total-count">0</span></p>
+    <ul id="scanned-list"></ul>
+
+    <button id="export-btn" style="display:none;">Export as CSV</button>
+    <button id="copy-btn" style="display:none;">Copy to Clipboard</button>
+
+    <div id="flash-overlay"></div>
+
+    <script src="https://unpkg.com/jsqr/dist/jsQR.js"></script>
+    <script>
+        // Elements
+        const startBtn = document.getElementById('start-btn');
+        const teamInput = document.getElementById('team-input');
+        const customerInput = document.getElementById('customer-input');
+        const video = document.getElementById('video');
+        const scannedList = document.getElementById('scanned-list');
+        const totalCount = document.getElementById('total-count');
+        const exportBtn = document.getElementById('export-btn');
+        const copyBtn = document.getElementById('copy-btn');
+        const submitBtn = document.getElementById('submit-btn');
+        const cameraSelect = document.getElementById('camera-select');
+
+        // Webhook URL
+        const webhookUrl = 'https://example.com/your-webhook-endpoint';
+
+        let scannedCodes = [];
+        let stream = null; // Store the current stream
+        let currentCameraId = null; // Store the current camera ID
+
+        /**
+        * Validate the input fields and enable/disable the Start button.
+        */
+        function validateInputs() {
+            const isTeamFilled = teamInput.value.trim() !== '';
+            const isCustomerFilled = customerInput.value.trim() !== '';
+    
+            if (isTeamFilled && isCustomerFilled) {
+                startBtn.disabled = false;
+                startBtn.style.backgroundColor = '#DD251D'; // Enable with default color
+            } else {
+                startBtn.disabled = true;
+                startBtn.style.backgroundColor = 'grey'; // Disable with grey color
+            }
+        }
+
+        // Add event listeners to inputs for validation
+        teamInput.addEventListener('input', validateInputs);
+        customerInput.addEventListener('input', validateInputs);
+        
+
+        // Required QR code prefix
+        const validQrPrefix = "https://permalink.atlassian.com/v1?experience=qr-code&reference=";
+
+
+        // Start the app when "Start submitting your tech stuff" button is clicked
+        startBtn.addEventListener('click', checkCameraPermissions);
+
+        /**
+         * checkCameraPermissions:
+         * Checks if camera permissions are granted. If so, it calls startCamera.
+         * If not, it prompts the user for camera access.
+         */
+        async function checkCameraPermissions() {
+            try {
+                // Check the camera permission status
+                const permissionStatus = await navigator.permissions.query({ name: 'camera' });
+                
+                if (permissionStatus.state === 'granted') {
+                    // Permission granted, directly start the camera
+                    startCamera();
+                } else if (permissionStatus.state === 'prompt') {
+                    // Prompt the user for permission if not yet granted
+                    await requestCameraAccess();
+                } else {
+                    alert("Camera access is required for this app to work.");
+                }
+
+                // Re-check the permission status if it changes while the app is open
+                permissionStatus.onchange = () => { 
+                    if (permissionStatus.state === 'granted') startCamera();
+                };
+            } catch (error) {
+                console.error("Permission request failed:", error);
+            }
+        }
+
+        /**
+         * requestCameraAccess:
+         * Requests camera access if not already granted.
+         * This function opens the camera and immediately stops it to just get the permission.
+         */
+        async function requestCameraAccess() {
+            try {
+                // Request camera access by starting and stopping a video stream
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                stream.getTracks().forEach(track => track.stop());
+                startCamera(); // Start camera after permission is granted
+            } catch (error) {
+                alert("Camera access denied. Please allow camera access to use this app.");
+            }
+        }
+
+        // Function to enumerate devices and start the camera
+        async function startCamera() {
+            startBtn.style.display = 'none';
+            exportBtn.style.display = 'block';
+            copyBtn.style.display = 'block';
+            cameraSelect.style.display = 'block'; // Show the camera select dropdown
+
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+                // Set currentCameraId to the last device in the list for default start
+                if (videoDevices.length > 0) {
+                    currentCameraId = videoDevices[videoDevices.length - 1].deviceId;
+                }
+
+                // Populate the camera select dropdown
+                videoDevices.forEach(device => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.textContent = device.label || `Camera ${cameraSelect.length + 1}`;
+                    cameraSelect.appendChild(option);
+                });
+
+                // Set the dropdown to show the last device as selected
+                cameraSelect.value = currentCameraId;
+                cameraSelect.style.display = 'block';
+
+                await startVideoStream(currentCameraId); // Start video stream with the last device by default
+            } catch (error) {
+                console.error("Error accessing the camera:", error);
+            }
+        }
+
+        async function startVideoStream(deviceId) {
+            // If a stream is already active, stop it
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+
+            // Start the new video stream with the selected device ID
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { deviceId: { exact: deviceId },
+                         advanced: [{ focusMode: "continuous" },
+                                    { zoom: 3.0 }
+                         ] 
+                        }
+            });
+            video.srcObject = stream;
+            video.style.display = 'block';
+            requestAnimationFrame(tick);
+        }
+
+        // Scanning QR codes
+        function tick() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const context = canvas.getContext('2d');
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+                if (code) {
+                    // Check if the scanned QR code starts with the required prefix
+                    if (code.data.startsWith(validQrPrefix)) {
+                        const extractedValue = extractIdFromQrCode(code.data);
+                        if (extractedValue && !scannedCodes.includes(extractedValue)) {
+                            scannedCodes.push(extractedValue);
+                            updateScannedList();
+
+                            // Trigger feedback for successful scan
+                            triggerFlashEffect();
+                            triggerFeedback();
+                        }
+                    }
+                }
+            }
+            requestAnimationFrame(tick);
+        }
+
+        // Function to extract the ITAM-XXXX from the QR code data
+        function extractIdFromQrCode(data) {
+            try {
+                // Extract the Base64 encoded part after the prefix
+                const base64String = data.replace(validQrPrefix, "");
+                const decodedString = atob(base64String);
+
+                // Split the decoded string and get the last part after the "/"
+                const parts = decodedString.split("/");
+                const id = parts[parts.length - 1];
+
+                // Return the formatted ID with "ITAM-" prefix
+                return "ITAM-" + id;
+            } catch (error) {
+                console.error("Error decoding QR code:", error);
+                return null; // Return null if there's an error
+            }
+        }
+
+        // Update the list of scanned codes
+        function updateScannedList() {
+            scannedList.innerHTML = '';
+            scannedCodes.forEach(code => {
+                const li = document.createElement('li');
+                li.textContent = code;
+                scannedList.appendChild(li);
+            });
+            totalCount.textContent = scannedCodes.length;
+        }
+
+        // Export to CSV
+        exportBtn.addEventListener('click', () => {
+            const csvContent = "data:text/csv;charset=utf-8," + scannedCodes.join("\n");
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "scanned_tech_items.csv");
+            document.body.appendChild(link); // Required for Firefox
+            link.click();
+            document.body.removeChild(link);
+        });
+
+         // Copy to Clipboard
+         copyBtn.addEventListener('click', () => {
+            const textToCopy = scannedCodes.join("\n");
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                alert("Scanned codes copied to clipboard!");
+            }).catch(err => {
+                console.error("Could not copy text: ", err);
+            });
+        });
+
+
+        // Add event listener to camera select
+        cameraSelect.addEventListener('change', (event) => {
+            currentCameraId = event.target.value; // Update current camera ID
+            startVideoStream(currentCameraId); // Restart the video stream with the new camera
+        });
+
+
+
+    /**
+ * Trigger the flash effect for visual feedback.
+ */
+function triggerFlashEffect() {
+    const flashOverlay = document.getElementById('flash-overlay');
+    flashOverlay.style.animation = 'none'; // Reset animation
+    void flashOverlay.offsetWidth; // Trigger reflow to restart animation
+    flashOverlay.style.animation = 'flashEffect 1.5s ease-out';
+}
+
+function triggerFeedback() {
+        // Add a green border to the video element
+        video.classList.add('feedback-blink');
+        setTimeout(() => video.classList.remove('feedback-blink'), 800); // Remove the class after 800ms
+
+        // Vibrate for 200ms if supported
+        if (navigator.vibrate) {
+            navigator.vibrate(200);
+        }
+    }
+
+
+    /**
+ * Enable/Disable the Submit button based on validation.
+ */
+function validateSubmit() {
+    const isTeamFilled = teamInput.value.trim() !== '';
+    const isCustomerFilled = customerInput.value.trim() !== '';
+    const hasScannedData = scannedCodes.length > 0;
+
+    if (isTeamFilled && isCustomerFilled && hasScannedData) {
+        submitBtn.disabled = false;
+        submitBtn.style.backgroundColor = '#DD251D'; // Enable with default color
+    } else {
+        submitBtn.disabled = true;
+        submitBtn.style.backgroundColor = 'grey'; // Disable with grey color
+    }
+}
+
+// Update Submit button state whenever input fields or scanned codes change
+teamInput.addEventListener('input', validateSubmit);
+customerInput.addEventListener('input', validateSubmit);
+scannedCodesList.addEventListener('DOMSubtreeModified', validateSubmit);
+
+/**
+ * Send the collected data to the webhook in JSON format.
+ */
+async function submitData() {
+    const payload = {
+        team: teamInput.value.trim(),
+        customer: customerInput.value.trim(),
+        scannedItems: scannedCodes,
+    };
+
+    try {
+        const response = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        });
+
+        if (response.ok) {
+            alert('Data submitted successfully!');
+        } else {
+            alert(`Submission failed: ${response.statusText}`);
+        }
+    } catch (error) {
+        console.error('Error submitting data:', error);
+        alert('An error occurred while submitting data.');
+    }
+}
+
+// Add event listener to the Submit button
+submitBtn.addEventListener('click', submitData);
+
+    </script>
+
+</body>
+</html>
